@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Merry Christmas</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
+
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Arial', sans-serif; }
+        #ui {
+            position: absolute; top: 8%; width: 100%; text-align: center;
+            color: #ffecd1; pointer-events: none; z-index: 10;
+            text-shadow: 0 0 20px rgba(255,140,50,0.9);
+        }
+        h1 { 
+            font-family: 'Great Vibes', cursive; 
+            font-size: 6rem; margin: 0; font-weight: 400; color: #fff; 
+            mix-blend-mode: overlay; 
+            animation: floatText 3s ease-in-out infinite alternate;
+        }
+        @keyframes floatText { from { transform: translateY(0); } to { transform: translateY(10px); } }
+        #writeBtn {
+            position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
+            z-index: 20;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            color: #fff; padding: 12px 35px; border-radius: 50px;
+            font-size: 1.5rem; cursor: pointer; backdrop-filter: blur(5px);
+            font-family: 'Great Vibes', cursive;
+            transition: all 0.3s;
+            box-shadow: 0 0 15px rgba(255, 165, 0, 0.3);
+        }
+        #writeBtn:hover { background: rgba(255, 255, 255, 0.3); box-shadow: 0 0 25px rgba(255, 215, 0, 0.6); transform: translateX(-50%) scale(1.1); }
+        #modalOverlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 30;
+            display: none; justify-content: center; align-items: center;
+            backdrop-filter: blur(4px);
+        }
+        .letter-paper {
+            width: 90%; max-width: 400px; height: 65vh;
+            background: #fffdf0;
+            background-image: linear-gradient(#e4e4e4 1px, transparent 1px);
+            background-size: 100% 2.2rem;
+            padding: 40px 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6), inset 0 0 60px rgba(165, 136, 86, 0.15);
+            position: relative;
+            transform-origin: center bottom;
+            animation: unfold 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            display: flex; flex-direction: column;
+            border-radius: 4px;
+        }
+        @keyframes unfold { 0% { transform: scaleY(0.1) scaleX(0.8); opacity: 0; } 100% { transform: scaleY(1) scaleX(1); opacity: 1; } }
+        .letter-header { font-family: 'Great Vibes', cursive; font-size: 2.8rem; color: #8b0000; text-align: center; margin-bottom: 15px; flex-shrink: 0; }
+        #messageContainer { flex: 1; overflow-y: auto; margin-bottom: 15px; font-family: 'Great Vibes', cursive; font-size: 1.6rem; color: #2c1a1a; line-height: 2.2rem; padding-right: 5px; }
+        .msg-item { border-bottom: 1px dashed rgba(0,0,0,0.1); padding: 8px 0; animation: fadeIn 0.5s; word-wrap: break-word; }
+        .msg-own { color: #d68a00; }
+        @keyframes fadeIn { from{opacity:0; transform: translateY(10px);} to{opacity:1;} }
+        .input-area { display: flex; gap: 10px; padding-top: 15px; border-top: 2px solid #8b0000; flex-shrink: 0; }
+        textarea { flex: 1; background: transparent; border: none; outline: none; font-family: 'Great Vibes', cursive; font-size: 1.6rem; resize: none; height: 50px; color: #333; }
+        #sendLetterBtn { background: #8b0000; color: white; border: none; padding: 0 20px; border-radius: 4px; cursor: pointer; font-family: serif; font-size: 1rem; }
+        .close-x { position: absolute; top: 10px; right: 15px; font-size: 2rem; cursor: pointer; color: #8b0000; font-family: sans-serif; line-height: 1; }
+        #messageContainer::-webkit-scrollbar { width: 4px; }
+        #messageContainer::-webkit-scrollbar-thumb { background: #d4af37; border-radius: 2px; }
+        #status-tip { font-size: 0.8rem; color: #d68a00; text-align: center; margin-bottom: 5px; opacity: 0.7; font-family: sans-serif;}
+    </style>
+</head>
+<body>
+
+    <div id="ui"><h1>Merry Christmas</h1></div>
+    <button id="writeBtn">✍️ Make a Wish</button>
+
+    <div id="modalOverlay">
+        <div class="letter-paper">
+            <div class="close-x" id="closeBtn">×</div>
+            <div class="letter-header">Dear Santa...</div>
+            <div id="status-tip">Initializing...</div>
+            <div id="messageContainer"></div>
+            <div class="input-area">
+                <textarea id="inputMsg" placeholder="Write your wish here..."></textarea>
+                <button id="sendLetterBtn">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // ==========================================
+        // 1. 3D 场景渲染 (视觉效果还原版)
+        // ==========================================
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x4a180a, 0.02); // 还原雾气效果
+
+        // 【背景还原】之前的暗夜极光效果
+        function createGradientTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 2; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            const grd = ctx.createLinearGradient(0, 0, 0, 512);
+            // 这里是之前的配色，保证是暗夜风格
+            grd.addColorStop(0, '#0f0518'); 
+            grd.addColorStop(0.4, '#3d0c18'); 
+            grd.addColorStop(0.7, '#a83216'); 
+            grd.addColorStop(1, '#ff9033');
+            ctx.fillStyle = grd; ctx.fillRect(0,0,2,512);
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.colorSpace = THREE.SRGBColorSpace;
+            return texture;
+        }
+        scene.background = createGradientTexture();
+
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 2, 14);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+        renderer.toneMappingExposure = 2.2;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffccaa, 0.6); scene.add(ambientLight);
+        const sunLight = new THREE.DirectionalLight(0xffaa55, 3.0); sunLight.position.set(8, 5, -5); sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048; sunLight.shadow.mapSize.height = 2048; scene.add(sunLight);
+        const frontLight = new THREE.PointLight(0xffaa88, 1.5, 20); frontLight.position.set(0, 5, 10); scene.add(frontLight);
+
+        // 【位置修正】整棵树往下挪到 -4.5 (之前是 -3.5)
+        const treeGroup = new THREE.Group(); 
+        treeGroup.position.y = -4.5; 
+        scene.add(treeGroup);
+
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 1.2, 3, 8), new THREE.MeshStandardMaterial({ color: 0x3d2817, roughness: 1.0 }));
+        trunk.position.y = 1.5; treeGroup.add(trunk);
+
+        const leavesMat = new THREE.MeshStandardMaterial({ color: 0x124a18, roughness: 0.7, metalness: 0.1, flatShading: true });
+        // 树的尺寸定义
+        const treeBaseY = 2.0; 
+        const treeHeight = 9.0; 
+        const baseRadius = 4.2; 
+        const layers = 24; 
+        
+        for(let i = 0; i < layers; i++) {
+            const t = i / (layers - 1); const y = treeBaseY + i * (treeHeight / layers); const radius = baseRadius * (1 - t) + 0.1; const count = Math.floor(radius * 7 + 5); 
+            for(let j = 0; j < count; j++) {
+                const angle = (j / count) * Math.PI * 2 + i * 2.3; const branch = new THREE.Mesh(new THREE.ConeGeometry(radius * 0.3, 1.6, 5), leavesMat);
+                const rPos = radius * 0.9; branch.position.set(Math.cos(angle)*rPos, y, Math.sin(angle)*rPos); branch.lookAt(0, y, 0);
+                branch.rotateX(-Math.PI / 2 - 0.15); branch.rotateZ((Math.random()-0.5)*0.3); branch.castShadow = true; branch.receiveShadow = true; treeGroup.add(branch);
+            }
+        }
+        const topTip = new THREE.Mesh(new THREE.ConeGeometry(0.3, 1.5, 8), leavesMat); topTip.position.y = treeBaseY + treeHeight - 0.5; treeGroup.add(topTip);
+
+        // 礼物盒
+        const boxGeo = new THREE.BoxGeometry(1, 1, 1); const giftMat = new THREE.MeshStandardMaterial({ roughness: 0.3, metalness: 0.1 }); 
+        const giftMesh = new THREE.InstancedMesh(boxGeo, giftMat, 80); const dummy = new THREE.Object3D(); const giftColors = [0xd10000, 0x005511, 0xffbb00, 0xffffff, 0x1a2b55, 0xc0c0c0];
+        for (let i = 0; i < 80; i++) {
+            const angle = Math.random() * Math.PI * 2; const r = 2.8 + Math.random() * 2.8; const s = 0.4 + Math.random() * 0.5;
+            let y = s * 0.5; if (Math.random() > 0.8) y += s; 
+            dummy.position.set(Math.cos(angle)*r, y, Math.sin(angle)*r); dummy.rotation.set(0, Math.random()*Math.PI, 0); dummy.scale.set(s, s, s); dummy.updateMatrix();
+            giftMesh.setMatrixAt(i, dummy.matrix); giftMesh.setColorAt(i, new THREE.Color(giftColors[Math.floor(Math.random() * giftColors.length)]));
+        }
+        giftMesh.castShadow = true; giftMesh.receiveShadow = true; treeGroup.add(giftMesh);
+
+        // --- 装饰球分布 (保留了底端密集的优化) ---
+        const redGeo = new THREE.SphereGeometry(0.12, 16, 16);
+        const redMat = new THREE.MeshStandardMaterial({ color: 0xe60000, metalness: 0.6, roughness: 0.2, emissive: 0x880000, emissiveIntensity: 1.0 });
+        const redMesh = new THREE.InstancedMesh(redGeo, redMat, 350); 
+
+        const goldGeo = new THREE.SphereGeometry(0.13, 16, 16); 
+        const goldMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.9, roughness: 0.1, emissive: 0x664400, emissiveIntensity: 0.6 });
+        const goldMesh = new THREE.InstancedMesh(goldGeo, goldMat, 300);
+
+        function getDistributionPos() {
+            // 让球主要集中在下方 (Power 1.5)
+            let rnd = Math.pow(Math.random(), 1.5);
+            // 避免顶部太密，如果随到顶部，有几率重随
+            if (rnd > 0.85 && Math.random() > 0.3) {
+                 rnd = Math.pow(Math.random(), 1.5);
+            }
+            // 【重要】起始高度设为 1.8，确保覆盖到底部树枝
+            const h = 1.8 + rnd * (treeHeight - 1.0); 
+
+            const t = (h - treeBaseY) / treeHeight; 
+            const maxR = baseRadius * (1 - t); 
+            const r = maxR * (0.8 + Math.random() * 0.35);
+            const angle = Math.random() * Math.PI * 2;
+            return { x: Math.cos(angle)*r, y: h, z: Math.sin(angle)*r };
+        }
+
+        for(let i=0; i<350; i++) {
+            const pos = getDistributionPos();
+            dummy.position.set(pos.x, pos.y, pos.z); 
+            dummy.scale.setScalar(0.7 + Math.random()*0.5); 
+            dummy.rotation.set(0,0,0); dummy.updateMatrix(); 
+            redMesh.setMatrixAt(i, dummy.matrix);
+        }
+
+        for(let i=0; i<300; i++) {
+            const pos = getDistributionPos();
+            dummy.position.set(pos.x, pos.y, pos.z); 
+            dummy.scale.setScalar(0.7 + Math.random()*0.5); 
+            dummy.rotation.set(0,0,0); dummy.updateMatrix(); 
+            goldMesh.setMatrixAt(i, dummy.matrix);
+        }
+        treeGroup.add(redMesh);
+        treeGroup.add(goldMesh);
+
+        // 星星
+        const starShape = new THREE.Shape(); const pts = 5;
+        for(let i=0; i<pts*2; i++){ const r = (i%2 === 0) ? 0.8 : 0.4; const a = (i / (pts*2)) * Math.PI * 2; const x = Math.cos(a) * r; const y = Math.sin(a) * r; if(i===0) starShape.moveTo(x, y); else starShape.lineTo(x, y); } starShape.closePath();
+        const star = new THREE.Mesh(new THREE.ExtrudeGeometry(starShape, { depth: 0.3, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.1 }), new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0xff5500, emissiveIntensity: 4.0, metalness: 0.8, roughness: 0.1 }));
+        star.position.set(0, treeBaseY + treeHeight + 0.2, 0); star.rotation.z = Math.PI / 10; treeGroup.add(star);
+        const starLight = new THREE.PointLight(0xffaa00, 5, 10); starLight.position.set(0, treeBaseY + treeHeight, 0); treeGroup.add(starLight);
+
+        // 灯海
+        const lPos = []; const lCols = []; const c1 = new THREE.Color(0xffaa00); const c2 = new THREE.Color(0xffffff);
+        for(let i=0; i<2500; i++){ 
+            const pos = getDistributionPos(); 
+            lPos.push(pos.x, pos.y, pos.z); 
+            const c = c1.clone().lerp(c2, Math.random()); 
+            lCols.push(c.r, c.g, c.b);
+        }
+        const lightsGeo = new THREE.BufferGeometry(); lightsGeo.setAttribute('position', new THREE.Float32BufferAttribute(lPos, 3)); lightsGeo.setAttribute('color', new THREE.Float32BufferAttribute(lCols, 3));
+        const lightsMat = new THREE.PointsMaterial({ size: 0.14, vertexColors: true, transparent: true, opacity: 1.0, blending: THREE.AdditiveBlending, depthWrite: false });
+        const lights = new THREE.Points(lightsGeo, lightsMat); treeGroup.add(lights);
+
+        // 树裙
+        const skirt = new THREE.Mesh(new THREE.CircleGeometry(6.0, 64), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1.0, side: THREE.DoubleSide }));
+        skirt.rotation.x = -Math.PI/2; skirt.position.y = 0.02; skirt.receiveShadow = true; treeGroup.add(skirt);
+
+        // 仙女棒
+        const sparks = []; const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
+        const sparkGeo = new THREE.BufferGeometry(); const sparkPositions = new Float32Array(2000 * 3); sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPositions, 3));
+        const sparkMesh = new THREE.Points(sparkGeo, new THREE.PointsMaterial({ color: 0xffeebb, size: 0.35, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
+        scene.add(sparkMesh);
+        class Sparkler { constructor(pos) { this.pos = pos.clone(); this.vel = new THREE.Vector3((Math.random()-0.5)*0.6, Math.random()*0.6, (Math.random()-0.5)*0.6); this.life = 1.0; this.decay = 0.015 + Math.random()*0.02; } update() { this.vel.y -= 0.02; this.pos.add(this.vel); this.life -= this.decay; return this.life > 0; } }
+        window.addEventListener('pointerdown', (e) => {
+            if(e.target.closest('#modalOverlay') || e.target.closest('#writeBtn')) return;
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1; mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera); const target = new THREE.Vector3(); raycaster.ray.at(12, target);
+            if(target.y < -3) target.y = -3 + Math.random()*5; for(let i=0; i<60; i++) sparks.push(new Sparkler(target));
+        });
+
+        const renderScene = new RenderPass(scene, camera);
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85); bloomPass.threshold = 0.25; bloomPass.strength = 1.2; bloomPass.radius = 0.6;
+        const composer = new EffectComposer(renderer); composer.addPass(renderScene); composer.addPass(bloomPass);
+
+        window.controls = new OrbitControls(camera, renderer.domElement); window.controls.enableDamping = true; window.controls.autoRotate = true; window.controls.autoRotateSpeed = 0.8; window.controls.target.set(0, 1, 0);
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate); const time = clock.getElapsedTime(); window.controls.update();
+            lightsMat.opacity = 0.6 + Math.sin(time * 3) * 0.4; star.rotation.y = -time * 0.3;
+            let count = 0; for(let i=sparks.length-1; i>=0; i--) { if(!sparks[i].update()) sparks.splice(i,1); else if(count < 2000) { sparkPositions[count*3] = sparks[i].pos.x; sparkPositions[count*3+1] = sparks[i].pos.y; sparkPositions[count*3+2] = sparks[i].pos.z; count++; } }
+            sparkMesh.geometry.setDrawRange(0, count); sparkMesh.geometry.attributes.position.needsUpdate = true;
+            composer.render();
+        }
+        animate();
+        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); composer.setSize(window.innerWidth, window.innerHeight); });
+
+
+        // ==========================================
+        //  🔥🔥🔥 Bmob 数据库逻辑 (REST API) 🔥🔥🔥
+        // ==========================================
+        
+        const modal = document.getElementById('modalOverlay');
+        const openBtn = document.getElementById('writeBtn');
+        const closeBtn = document.getElementById('closeBtn');
+        const sendBtn = document.getElementById('sendLetterBtn');
+        const inputMsg = document.getElementById('inputMsg');
+        const msgContainer = document.getElementById('messageContainer');
+        const statusTip = document.getElementById('status-tip');
+
+        // 👇👇👇【请在这里填入你的 Bmob 密钥】👇👇👇
+        // ⚠️注意：不要填之前的 Secret Key！
+        const APP_ID       = "4df056effdeddcd8964f3726eab15aa0"; 
+        const REST_API_KEY = "40586af5f35f553e12925984d3d99598";
+        // 👆👆👆 -------------------------------- 👆👆👆
+
+        let isOfflineMode = false;
+
+        function renderMessage(text, isOwn = false) {
+            const div = document.createElement('div');
+            div.className = isOwn ? 'msg-item msg-own' : 'msg-item';
+            div.textContent = text;
+            msgContainer.appendChild(div);
+            msgContainer.scrollTop = msgContainer.scrollHeight;
+        }
+
+        // 通用 Fetch 函数
+        async function bmobRequest(method, endpoint, data = null) {
+            if (APP_ID.includes("你的Application")) {
+                throw new Error("请先填写正确的 Key");
+            }
+            const cleanAppId = APP_ID.trim();
+            const cleanRestKey = REST_API_KEY.trim();
+
+            const url = `https://api.bmobcloud.com/1/classes/${endpoint}`;
+            const headers = {
+                'X-Bmob-Application-Id': cleanAppId,
+                'X-Bmob-REST-API-Key': cleanRestKey,
+                'Content-Type': 'application/json'
+            };
+            const options = { method, headers };
+            if (data) options.body = JSON.stringify(data);
+
+            const res = await fetch(url, options);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.json();
+        }
+
+        // 初始化
+        async function initDB() {
+            try {
+                if (APP_ID.includes("你的Application")) {
+                     statusTip.innerText = "Key not set";
+                     isOfflineMode = true;
+                     return;
+                }
+                statusTip.innerText = "Connecting...";
+                // 尝试自动创建表/测试连接
+                await bmobRequest('POST', 'ChristmasWishes', { content: "System Init", type: "init" });
+                console.log("✅ Bmob 连接成功");
+                statusTip.innerText = "Connected to Bmob ☁️";
+                fetchMessages(); // 连接成功后拉取一次
+            } catch (e) {
+                console.warn("连接失败或Key未填，转离线模式", e);
+                isOfflineMode = true;
+                statusTip.innerText = "Offline Mode";
+            }
+        }
+
+        // 获取消息
+        async function fetchMessages() {
+            msgContainer.innerHTML = '';
+            
+            if (isOfflineMode) {
+                const localWishes = JSON.parse(localStorage.getItem('local_wishes') || '[]');
+                if(localWishes.length === 0) msgContainer.innerHTML = '<div style="text-align:center; color:#ccc; margin-top:20px;">No wishes locally.</div>';
+                else localWishes.forEach(txt => renderMessage(txt));
+                return;
+            }
+
+            msgContainer.innerHTML = '<div style="text-align:center; color:#999; margin-top:20px;">Loading...</div>';
+            
+            try {
+                // 按创建时间倒序获取50条
+                const data = await bmobRequest('GET', 'ChristmasWishes?order=-createdAt&limit=50');
+                msgContainer.innerHTML = '';
+                if (data.results && data.results.length > 0) {
+                    // 过滤掉 init 消息
+                    const list = data.results.filter(item => item.content !== "System Init").reverse();
+                    if(list.length === 0) msgContainer.innerHTML = '<div style="text-align:center; color:#ccc;">No wishes yet.</div>';
+                    else list.forEach(item => renderMessage(item.content));
+                } else {
+                    msgContainer.innerHTML = '<div style="text-align:center; color:#ccc;">No wishes yet.</div>';
+                }
+            } catch (err) {
+                console.error(err);
+                isOfflineMode = true;
+                msgContainer.innerHTML = '<div style="text-align:center; color:red;">Network Error</div>';
+            }
+        }
+
+        // 发送消息
+        sendBtn.addEventListener('click', async () => {
+            const text = inputMsg.value.trim(); 
+            if(!text) return;
+
+            sendBtn.disabled = true; 
+            sendBtn.textContent = "...";
+
+            if (isOfflineMode) {
+                const localWishes = JSON.parse(localStorage.getItem('local_wishes') || '[]');
+                localWishes.push(text);
+                localStorage.setItem('local_wishes', JSON.stringify(localWishes));
+                renderMessage(text, true);
+                inputMsg.value = "";
+                sendBtn.disabled = false; sendBtn.textContent = "Send";
+            } else {
+                try {
+                    await bmobRequest('POST', 'ChristmasWishes', { content: text });
+                    renderMessage(text, true);
+                    inputMsg.value = "";
+                } catch (err) {
+                    alert("发送失败，转存本地");
+                    const localWishes = JSON.parse(localStorage.getItem('local_wishes') || '[]');
+                    localWishes.push(text);
+                    localStorage.setItem('local_wishes', JSON.stringify(localWishes));
+                    renderMessage(text, true);
+                    inputMsg.value = "";
+                } finally {
+                    sendBtn.disabled = false; sendBtn.textContent = "Send";
+                }
+            }
+        });
+
+        function openModal() {
+            modal.style.display = 'flex';
+            if(window.controls) window.controls.enabled = false;
+            fetchMessages(); 
+        }
+        function closeModal() {
+            modal.style.display = 'none';
+            if(window.controls) window.controls.enabled = true;
+            inputMsg.value = "";
+        }
+        openBtn.addEventListener('click', openModal);
+        closeBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+        // 启动
+        initDB();
+
+    </script>
+</body>
+</html>
